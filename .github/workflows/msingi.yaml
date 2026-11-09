@@ -1,0 +1,598 @@
+# ramani: .github/workflows/msingi.yaml
+name: Msingi
+
+on:
+  workflow_dispatch:
+    inputs:
+      # Server Connection Settings
+      server_host:
+        description: "Server IP address or hostname"
+        required: true
+        type: string
+      server_port:
+        description: "SSH port"
+        required: false
+        type: string
+        default: "22"
+      # User Configuration
+      target_user:
+        description: "Target user to setup (will be created if doesn't exist)"
+        required: true
+        type: string
+      make_user_sudo:
+        description: "Grant user passwordless sudo privileges (applies to both new and existing users)"
+        required: false
+        type: boolean
+        default: false
+      ssh_public_key:
+        description: "SSH public key to add to authorized_keys for the target user"
+        required: false
+        type: string
+      # Setup Configuration
+      setup_profile:
+        description: "Setup profile to use"
+        required: true
+        type: choice
+        options:
+          - "Full Development Server"
+          - "System Services Only"
+          - "User Tools Only"
+          - "Custom (use repository variables)"
+        default: "Full Development Server"
+      # Tool-Specific Settings
+      git_user_name:
+        description: "Git user name (required for user tools)"
+        required: false
+        type: string
+      git_user_email:
+        description: "Git user email (required for user tools)"
+        required: false
+        type: string
+      # Execution Mode
+      dry_run:
+        description: "Dry run mode - simulates execution without making actual changes"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Determine modules to install
+        id: modules
+        run: |
+          PROFILE="${{ inputs.setup_profile }}"
+
+          # Default all to false
+          OPENSSH_UFW="false"
+          PACKAGES="false"
+          NGINX="false"
+          CERTBOT="false"
+          POSTGRES="false"
+          UV="false"
+          NVM="false"
+          REPOS="false"
+          GIT_SSH="false"
+
+          case "$PROFILE" in
+            "Full Development Server")
+              OPENSSH_UFW="true"
+              PACKAGES="true"
+              NGINX="true"
+              CERTBOT="true"
+              POSTGRES="true"
+              UV="true"
+              NVM="true"
+              REPOS="true"
+              GIT_SSH="true"
+              ;;
+            "System Services Only")
+              OPENSSH_UFW="true"
+              PACKAGES="true"
+              NGINX="true"
+              CERTBOT="true"
+              POSTGRES="true"
+              ;;
+            "User Tools Only")
+              UV="true"
+              NVM="true"
+              REPOS="true"
+              GIT_SSH="true"
+              ;;
+            "Custom (use repository variables)")
+              # Read from repository variables
+              OPENSSH_UFW="${{ vars.SETUP_OPENSSH_UFW || 'false' }}"
+              PACKAGES="${{ vars.SETUP_PACKAGES || 'false' }}"
+              NGINX="${{ vars.SETUP_NGINX || 'false' }}"
+              CERTBOT="${{ vars.SETUP_CERTBOT || 'false' }}"
+              POSTGRES="${{ vars.SETUP_POSTGRES || 'false' }}"
+              UV="${{ vars.SETUP_UV || 'false' }}"
+              NVM="${{ vars.SETUP_NVM || 'false' }}"
+              REPOS="${{ vars.SETUP_REPOS_DIR || 'false' }}"
+              GIT_SSH="${{ vars.SETUP_GIT_SSH || 'false' }}"
+              ;;
+          esac
+
+          echo "setup_openssh_ufw=$OPENSSH_UFW" >> $GITHUB_OUTPUT
+          echo "setup_packages=$PACKAGES" >> $GITHUB_OUTPUT
+          echo "setup_nginx=$NGINX" >> $GITHUB_OUTPUT
+          echo "setup_certbot=$CERTBOT" >> $GITHUB_OUTPUT
+          echo "setup_postgres=$POSTGRES" >> $GITHUB_OUTPUT
+          echo "setup_uv=$UV" >> $GITHUB_OUTPUT
+          echo "setup_nvm=$NVM" >> $GITHUB_OUTPUT
+          echo "setup_repos_dir=$REPOS" >> $GITHUB_OUTPUT
+          echo "setup_git_ssh=$GIT_SSH" >> $GITHUB_OUTPUT
+          echo "dry_run=${{ inputs.dry_run }}" >> $GITHUB_OUTPUT
+
+          echo "📋 Selected Profile: $PROFILE"
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo "⚠️  DRY RUN MODE ENABLED - No changes will be made"
+          fi
+          echo "System Modules: openssh_ufw=$OPENSSH_UFW, packages=$PACKAGES, nginx=$NGINX, certbot=$CERTBOT, postgres=$POSTGRES"
+          echo "User Modules: uv=$UV, nvm=$NVM, repos=$REPOS, git_ssh=$GIT_SSH"
+
+      - name: Validate inputs
+        id: validate
+        run: |
+          # Validate git inputs for git_ssh setup
+          if [[ "${{ steps.modules.outputs.setup_git_ssh }}" == "true" ]]; then
+            if [[ -z "${{ inputs.git_user_name }}" || -z "${{ inputs.git_user_email }}" ]]; then
+              echo "❌ Error: git_user_name and git_user_email are required when Git/SSH setup is enabled"
+              exit 1
+            fi
+
+            # Validate email format
+            if [[ ! "${{ inputs.git_user_email }}" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+              echo "❌ Error: Invalid email format"
+              exit 1
+            fi
+          fi
+
+          # Check if any system modules are enabled
+          if [[ "${{ steps.modules.outputs.setup_openssh_ufw }}" == "true" ]] || \
+             [[ "${{ steps.modules.outputs.setup_packages }}" == "true" ]] || \
+             [[ "${{ steps.modules.outputs.setup_nginx }}" == "true" ]] || \
+             [[ "${{ steps.modules.outputs.setup_certbot }}" == "true" ]] || \
+             [[ "${{ steps.modules.outputs.setup_postgres }}" == "true" ]]; then
+            echo "has_system_modules=true" >> $GITHUB_OUTPUT
+            echo "⚠️  Note: System setup modules require SUDO_ACCESS_USER to be configured"
+            if [[ -z "${{ secrets.SUDO_ACCESS_USER }}" ]]; then
+              echo "❌ Error: SUDO_ACCESS_USER secret must be set for system operations"
+              exit 1
+            fi
+          else
+            echo "has_system_modules=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          # Use cat with heredoc to safely write the key
+          cat > ~/.ssh/deploy_key <<'SSHKEY_EOF'
+          ${{ secrets.SERVER_SSH_KEY }}
+          SSHKEY_EOF
+
+          # Ensure proper line ending
+          echo "" >> ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # Verify key format
+          if ! ssh-keygen -l -f ~/.ssh/deploy_key >/dev/null 2>&1; then
+            echo "❌ Error: Invalid SSH key format"
+            exit 1
+          fi
+
+          ssh-keyscan -p ${{ inputs.server_port }} -H ${{ inputs.server_host }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Test SSH connection
+        run: |
+          # Determine which user to connect as for system operations
+          if [[ "${{ steps.validate.outputs.has_system_modules }}" == "true" ]]; then
+            SSH_USER="${{ secrets.SUDO_ACCESS_USER }}"
+          else
+            SSH_USER="${{ inputs.target_user }}"
+          fi
+
+          if ! ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new ${SSH_USER}@${{ inputs.server_host }} "echo 'SSH connection successful'"; then
+            echo "❌ Failed to establish SSH connection"
+            exit 1
+          fi
+
+      - name: Create or Update target user
+        run: |
+          # Connect as sudo user if system modules are enabled, otherwise as target user
+          if [[ "${{ steps.validate.outputs.has_system_modules }}" == "true" ]]; then
+            SSH_USER="${{ secrets.SUDO_ACCESS_USER }}"
+          else
+            SSH_USER="${{ inputs.target_user }}"
+          fi
+
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${SSH_USER}@${{ inputs.server_host }} bash <<'ENDSSH'
+            set -e
+
+            TARGET_USER="${{ inputs.target_user }}"
+            MAKE_SUDO="${{ inputs.make_user_sudo }}"
+            SSH_PUB_KEY="${{ inputs.ssh_public_key }}"
+            export DRY_RUN="${{ inputs.dry_run }}"
+
+            run_as_sudo() {
+              if [[ "$DRY_RUN" == "true" ]]; then
+                echo "[DRY RUN] Would execute as sudo: $@"
+                return 0
+              fi
+              if [[ $EUID -eq 0 ]]; then
+                "$@"
+              elif command -v sudo >/dev/null 2>&1; then
+                sudo "$@"
+              else
+                echo "❌ Error: Need root or sudo permissions"
+                exit 1
+              fi
+            }
+
+            # Check if user exists, create if not
+            if id "$TARGET_USER" &>/dev/null; then
+              echo "✅ User $TARGET_USER already exists"
+            else
+              if [[ "$DRY_RUN" == "true" ]]; then
+                echo "[DRY RUN] Would create user: $TARGET_USER"
+              else
+                echo "🔧 Creating user: $TARGET_USER"
+                run_as_sudo useradd -m -s /bin/bash "$TARGET_USER"
+                echo "✅ User $TARGET_USER created successfully"
+              fi
+            fi
+
+            # Grant sudo access if requested
+            if [[ "$MAKE_SUDO" == "true" ]]; then
+              if [[ "$DRY_RUN" == "true" ]]; then
+                echo "[DRY RUN] Would grant sudo privileges to: $TARGET_USER"
+              else
+                echo "🔧 Ensuring $TARGET_USER is a sudoer"
+                run_as_sudo usermod -aG sudo "$TARGET_USER"
+                # Enable passwordless sudo
+                echo "$TARGET_USER ALL=(ALL) NOPASSWD:ALL" | run_as_sudo tee "/etc/sudoers.d/$TARGET_USER" > /dev/null
+                run_as_sudo chmod 440 "/etc/sudoers.d/$TARGET_USER"
+                echo "✅ $TARGET_USER has sudo privileges"
+              fi
+            fi
+
+            # Add SSH public key if provided
+            if [[ -n "$SSH_PUB_KEY" ]]; then
+              if [[ "$DRY_RUN" == "true" ]]; then
+                echo "[DRY RUN] Would add SSH public key for $TARGET_USER"
+              else
+                echo "🔑 Adding SSH public key for $TARGET_USER"
+                USER_HOME=$(eval echo ~$TARGET_USER)
+                run_as_sudo mkdir -p "$USER_HOME/.ssh"
+                # Add key only if it's not already there
+                if ! run_as_sudo grep -qF "$SSH_PUB_KEY" "$USER_HOME/.ssh/authorized_keys" 2>/dev/null; then
+                  run_as_sudo bash -c "echo '$SSH_PUB_KEY' >> '$USER_HOME/.ssh/authorized_keys'"
+                  echo "✅ Public key added"
+                else
+                  echo "✅ Public key already exists"
+                fi
+                run_as_sudo chmod 700 "$USER_HOME/.ssh"
+                run_as_sudo chmod 600 "$USER_HOME/.ssh/authorized_keys"
+                run_as_sudo chown -R "$TARGET_USER:$TARGET_USER" "$USER_HOME/.ssh"
+              fi
+            fi
+          ENDSSH
+
+      - name: Upload scripts to server
+        id: upload-scripts
+        run: |
+          if [[ "${{ steps.validate.outputs.has_system_modules }}" == "true" ]]; then
+            SSH_USER="${{ secrets.SUDO_ACCESS_USER }}"
+          else
+            SSH_USER="${{ inputs.target_user }}"
+          fi
+
+          DATE=$(date -u +%Y%m%d_%H%M%S)
+          SETUP_DIR="msingi-$DATE-UTC"
+          REMOTE_DIR="/tmp/$SETUP_DIR"
+
+          # Create isolated dated directory
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${SSH_USER}@${{ inputs.server_host }} "mkdir -p '$REMOTE_DIR'"
+
+          # Copy scripts into that directory
+          scp -i ~/.ssh/deploy_key -P ${{ inputs.server_port }} scripts/*.sh ${SSH_USER}@${{ inputs.server_host }}:"$REMOTE_DIR/"
+
+          # Expose outputs
+          echo "setup_dir_date=$DATE" >> $GITHUB_OUTPUT
+          echo "setup_dir=$REMOTE_DIR" >> $GITHUB_OUTPUT
+
+      - name: Initial system update
+        if: steps.validate.outputs.has_system_modules == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${{ secrets.SUDO_ACCESS_USER }}@${{ inputs.server_host }} bash <<'ENDSSH'
+            set -e
+            export DRY_RUN="${{ inputs.dry_run }}"
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "[DRY RUN] Would run apt-get update"
+            else
+              echo "🔄 Running apt-get update..."
+              if [[ $EUID -eq 0 ]]; then
+                DEBIAN_FRONTEND=noninteractive apt-get update -y
+              elif command -v sudo >/dev/null 2>&1; then
+                sudo DEBIAN_FRONTEND=noninteractive apt-get update -y
+              else
+                echo "❌ Error: Need root or sudo for system operations"
+                exit 1
+              fi
+            fi
+          ENDSSH
+
+      - name: Setup OpenSSH and UFW
+        if: steps.modules.outputs.setup_openssh_ufw == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${{ secrets.SUDO_ACCESS_USER }}@${{ inputs.server_host }} bash <<'ENDSSH'
+            set -e
+            export DRY_RUN="${{ inputs.dry_run }}"
+            SETUP_DIR="${{ steps.upload-scripts.outputs.setup_dir }}"
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "[DRY RUN] Would setup OpenSSH and UFW"
+            else
+              echo "🚀 Setting up OpenSSH and UFW..."
+              if [[ $EUID -eq 0 ]]; then
+                bash "$SETUP_DIR/openssh-ufw.sh"
+              elif command -v sudo >/dev/null 2>&1; then
+                sudo bash "$SETUP_DIR/openssh-ufw.sh"
+              fi
+              echo "✅ OpenSSH and UFW setup completed"
+            fi
+          ENDSSH
+
+      - name: Setup necessary packages
+        if: steps.modules.outputs.setup_packages == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${{ secrets.SUDO_ACCESS_USER }}@${{ inputs.server_host }} bash <<'ENDSSH'
+            set -e
+            export DRY_RUN="${{ inputs.dry_run }}"
+            SETUP_DIR="${{ steps.upload-scripts.outputs.setup_dir }}"
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "[DRY RUN] Would install necessary packages"
+            else
+              echo "🚀 Installing necessary packages..."
+              if [[ $EUID -eq 0 ]]; then
+                bash "$SETUP_DIR/packages.sh"
+              elif command -v sudo >/dev/null 2>&1; then
+                sudo bash "$SETUP_DIR/packages.sh"
+              fi
+              echo "✅ Necessary packages setup completed"
+            fi
+          ENDSSH
+
+      - name: Setup Nginx
+        if: steps.modules.outputs.setup_nginx == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${{ secrets.SUDO_ACCESS_USER }}@${{ inputs.server_host }} bash <<'ENDSSH'
+            set -e
+            export DRY_RUN="${{ inputs.dry_run }}"
+            SETUP_DIR="${{ steps.upload-scripts.outputs.setup_dir }}"
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "[DRY RUN] Would setup Nginx"
+            else
+              echo "🚀 Setting up Nginx..."
+              if [[ $EUID -eq 0 ]]; then
+                bash "$SETUP_DIR/nginx.sh"
+              elif command -v sudo >/dev/null 2>&1; then
+                sudo bash "$SETUP_DIR/nginx.sh"
+              fi
+              echo "✅ Nginx setup completed"
+            fi
+          ENDSSH
+
+      - name: Setup Certbot
+        if: steps.modules.outputs.setup_certbot == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${{ secrets.SUDO_ACCESS_USER }}@${{ inputs.server_host }} bash <<'ENDSSH'
+            set -e
+            export DRY_RUN="${{ inputs.dry_run }}"
+            SETUP_DIR="${{ steps.upload-scripts.outputs.setup_dir }}"
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "[DRY RUN] Would setup Certbot"
+            else
+              echo "🚀 Setting up Certbot..."
+              if [[ $EUID -eq 0 ]]; then
+                bash "$SETUP_DIR/certbot.sh"
+              elif command -v sudo >/dev/null 2>&1; then
+                sudo bash "$SETUP_DIR/certbot.sh"
+              fi
+              echo "✅ Certbot setup completed"
+            fi
+          ENDSSH
+
+      - name: Setup PostgreSQL
+        if: steps.modules.outputs.setup_postgres == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${{ secrets.SUDO_ACCESS_USER }}@${{ inputs.server_host }} bash <<'ENDSSH'
+            set -e
+            export DRY_RUN="${{ inputs.dry_run }}"
+            SETUP_DIR="${{ steps.upload-scripts.outputs.setup_dir }}"
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "[DRY RUN] Would setup PostgreSQL"
+            else
+              echo "🚀 Setting up PostgreSQL..."
+              if [[ $EUID -eq 0 ]]; then
+                bash "$SETUP_DIR/postgres.sh"
+              elif command -v sudo >/dev/null 2>&1; then
+                sudo bash "$SETUP_DIR/postgres.sh"
+              fi
+              echo "✅ PostgreSQL setup completed"
+            fi
+          ENDSSH
+
+      - name: Setup uv Python manager
+        if: steps.modules.outputs.setup_uv == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${{ inputs.target_user }}@${{ inputs.server_host }} bash <<'ENDSSH'
+            set -e
+            export DRY_RUN="${{ inputs.dry_run }}"
+            SETUP_DIR="${{ steps.upload-scripts.outputs.setup_dir }}"
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "[DRY RUN] Would setup uv"
+            else
+              echo "🚀 Setting up uv..."
+              bash "$SETUP_DIR/uv.sh"
+              echo "✅ uv setup completed"
+            fi
+          ENDSSH
+
+      - name: Setup nvm Node.js manager
+        if: steps.modules.outputs.setup_nvm == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${{ inputs.target_user }}@${{ inputs.server_host }} bash <<'ENDSSH'
+            set -e
+            export DRY_RUN="${{ inputs.dry_run }}"
+            SETUP_DIR="${{ steps.upload-scripts.outputs.setup_dir }}"
+            export NVM_VERSION="${{ vars.NVM_VERSION || 'v0.40.4' }}"
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "[DRY RUN] Would setup nvm"
+            else
+              echo "🚀 Setting up nvm..."
+              bash "$SETUP_DIR/nvm.sh"
+              echo "✅ nvm setup completed"
+            fi
+          ENDSSH
+
+      - name: Setup repos directory
+        if: steps.modules.outputs.setup_repos_dir == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${{ inputs.target_user }}@${{ inputs.server_host }} bash <<'ENDSSH'
+            set -e
+            export DRY_RUN="${{ inputs.dry_run }}"
+            SETUP_DIR="${{ steps.upload-scripts.outputs.setup_dir }}"
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "[DRY RUN] Would setup repos directory"
+            else
+              echo "🚀 Setting up repos directory..."
+              bash "$SETUP_DIR/repos.sh"
+              echo "✅ repos directory setup completed"
+            fi
+          ENDSSH
+
+      - name: Setup Git and SSH
+        if: steps.modules.outputs.setup_git_ssh == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${{ inputs.target_user }}@${{ inputs.server_host }} bash <<'ENDSSH'
+            set -e
+            export DRY_RUN="${{ inputs.dry_run }}"
+            SETUP_DIR="${{ steps.upload-scripts.outputs.setup_dir }}"
+            export GIT_USER_NAME="${{ inputs.git_user_name }}"
+            export GIT_USER_EMAIL="${{ inputs.git_user_email }}"
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "[DRY RUN] Would setup Git and SSH"
+            else
+              echo "🚀 Setting up Git and SSH..."
+              bash "$SETUP_DIR/git-ssh.sh"
+              echo "✅ Git and SSH setup completed"
+            fi
+          ENDSSH
+
+      - name: Retrieve setup credentials
+        if: steps.modules.outputs.setup_git_ssh == 'true'
+        id: credentials
+        run: |
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo "[DRY RUN] Would retrieve SSH public key"
+            exit 0
+          fi
+
+          TEMP_DIR=$(mktemp -d)
+
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${{ inputs.target_user }}@${{ inputs.server_host }} bash <<'ENDSSH' > "$TEMP_DIR/output"
+            # Get SSH public key
+            KEY_PATH="$HOME/.ssh/id_ed25519.pub"
+            if [ -f "$KEY_PATH" ]; then
+              echo "SSH_PUBLIC_KEY<<EOF"
+              cat "$KEY_PATH"
+              echo "EOF"
+            fi
+          ENDSSH
+
+          # Parse output and set as masked outputs
+          SSH_KEY=""
+
+          while IFS= read -r line; do
+            if [[ "$line" == "SSH_PUBLIC_KEY<<EOF" ]]; then
+              SSH_KEY=""
+              while IFS= read -r keyline; do
+                [[ "$keyline" == "EOF" ]] && break
+                SSH_KEY+="$keyline"
+              done
+              echo "ssh_key=$SSH_KEY" >> $GITHUB_OUTPUT
+            fi
+          done < "$TEMP_DIR/output"
+
+          # Validate we got the expected credentials
+          if [[ "${{ steps.modules.outputs.setup_git_ssh }}" == "true" ]]; then
+            if [[ -z "$SSH_KEY" ]]; then
+              echo "::error::Failed to retrieve SSH public key"
+              exit 1
+            fi
+          fi
+
+          rm -rf "$TEMP_DIR"
+
+      - name: Display setup summary
+        if: steps.modules.outputs.setup_git_ssh == 'true'
+        run: |
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo "## ⚠️ Dry Run Completed!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This was a **simulation only** - no changes were made to the server." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ✅ Setup Completed Successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "### 📋 Profile Used" >> $GITHUB_STEP_SUMMARY
+          echo "- **Profile:** ${{ inputs.setup_profile }}" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo "- **Mode:** 🔍 Dry Run (simulation only)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 👤 Configured User" >> $GITHUB_STEP_SUMMARY
+          echo "- **User:** ${{ inputs.target_user }}" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ inputs.make_user_sudo }}" == "true" ]]; then
+            echo "- **Sudo Access:** ✅ Granted (passwordless)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Sudo Access:** ❌ Not granted" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ steps.modules.outputs.setup_git_ssh }}" == "true" && "${{ inputs.dry_run }}" != "true" ]]; then
+            echo "### 🔑 SSH Public Key" >> $GITHUB_STEP_SUMMARY
+            echo "Add this to your Git hosting service (GitHub/GitLab/etc.):" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.credentials.outputs.ssh_key }}" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "### ⚠️ Important Notes" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ steps.modules.outputs.setup_git_ssh }}" == "true" ]]; then
+            echo "- The SSH private key remains on the server at \`~${{ inputs.target_user }}/.ssh/id_ed25519\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          if [[ "${{ steps.validate.outputs.has_system_modules }}" == "true" ]]; then
+            SSH_USER="${{ secrets.SUDO_ACCESS_USER }}"
+          else
+            SSH_USER="${{ inputs.target_user }}"
+          fi
+          # Remove remote dated directory
+          ssh -i ~/.ssh/deploy_key -p ${{ inputs.server_port }} ${SSH_USER}@${{ inputs.server_host }} "rm -rf '${{ steps.upload-scripts.outputs.setup_dir }}'" 2>/dev/null || true
+          rm -f ~/.ssh/deploy_key

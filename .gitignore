@@ -1,0 +1,6 @@
+# ramani: .gitignore
+# `.tmp` folder is intended for roughwork files. Ignore it.
+/.tmp/
+
+# Ignore environment variable files
+.env
