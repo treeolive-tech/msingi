@@ -20,13 +20,21 @@ def test_lists_are_quoted_word_by_word():
 
 
 def test_strings_run_in_bash_so_shell_syntax_works():
-    assert remote_command(UBUNTU, "echo $HOME | wc -c") == "bash -c 'echo $HOME | wc -c'"
+    assert (
+        remote_command(UBUNTU, "echo $HOME | wc -c") == "bash -c 'echo $HOME | wc -c'"
+    )
 
 
 def test_sudo_is_added_unless_root():
-    assert remote_command(UBUNTU, ["apt-get", "update"], sudo=True) == "sudo -n apt-get update"
+    assert (
+        remote_command(UBUNTU, ["apt-get", "update"], sudo=True)
+        == "sudo -n apt-get update"
+    )
     assert remote_command(ROOT, ["apt-get", "update"], sudo=True) == "apt-get update"
-    assert remote_command(UBUNTU, "ls | wc -l", sudo=True) == "sudo -n bash -c 'ls | wc -l'"
+    assert (
+        remote_command(UBUNTU, "ls | wc -l", sudo=True)
+        == "sudo -n bash -c 'ls | wc -l'"
+    )
 
 
 def test_ssh_command_targets_user_host_and_port():
@@ -38,8 +46,9 @@ def test_ssh_command_targets_user_host_and_port():
 
 
 def test_ssh_command_uses_the_key_only():
-    command = ssh_command(Connection("h", "dev", key=Path("/keys/deploy")), "uptime")
-    assert command[command.index("-i") + 1] == "/keys/deploy"
+    key = Path("/keys/deploy")
+    command = ssh_command(Connection("h", "dev", key=key), "uptime")
+    assert command[command.index("-i") + 1] == str(key)
     assert "IdentitiesOnly=yes" in command
 
 
@@ -49,7 +58,9 @@ def fake_subprocess(monkeypatch, returncode=0, stdout="", stderr=""):
 
     def fake(args, **kwargs):
         seen.append((args, kwargs))
-        return subprocess.CompletedProcess(args, returncode, stdout.encode(), stderr.encode())
+        return subprocess.CompletedProcess(
+            args, returncode, stdout.encode(), stderr.encode()
+        )
 
     monkeypatch.setattr(ssh.shutil, "which", lambda name: "/usr/bin/ssh")
     monkeypatch.setattr(ssh.subprocess, "run", fake)
@@ -62,7 +73,7 @@ def test_run_without_input_closes_stdin(monkeypatch):
     kwargs = seen[0][1]
     assert result.stdout == "hi"
     assert kwargs["stdin"] == subprocess.DEVNULL
-    assert "input" not in kwargs
+    assert kwargs["input"] is None
 
 
 def test_run_sends_input_to_stdin_as_bytes_with_unix_line_endings(monkeypatch):
@@ -71,6 +82,7 @@ def test_run_sends_input_to_stdin_as_bytes_with_unix_line_endings(monkeypatch):
     sent = seen[0][1]["input"]
     assert sent == b"dev ALL=(ALL) NOPASSWD:ALL\n"
     assert b"\r" not in sent
+    assert seen[0][1]["stdin"] is None
     assert "text" not in seen[0][1]
 
 
@@ -106,7 +118,9 @@ def test_missing_ssh_client_is_explained(monkeypatch):
 
 
 def test_connection_error_has_reason_and_hint(monkeypatch):
-    fake_subprocess(monkeypatch, returncode=255, stderr="Permission denied (publickey).\n")
+    fake_subprocess(
+        monkeypatch, returncode=255, stderr="Permission denied (publickey).\n"
+    )
     with pytest.raises(MsingiError) as err:
         ssh.check_connection(UBUNTU, hint="Try --key.")
     message = str(err.value)

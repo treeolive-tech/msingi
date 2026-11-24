@@ -37,5 +37,12 @@ def setup(conn: Connection, settings: Settings) -> None:
 
 def remove_apt_certbot(conn: Connection) -> None:
     """Remove the apt build of Certbot, which would clash with the snap."""
-    command = ["env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "remove", "-y", "certbot"]
+    command = [
+        "env",
+        "DEBIAN_FRONTEND=noninteractive",
+        "apt-get",
+        "remove",
+        "-y",
+        "certbot",
+    ]
     ssh.run(conn, command, sudo=True, check=False)

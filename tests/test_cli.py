@@ -23,7 +23,11 @@ def test_defaults_to_the_full_profile(seen):
     settings = seen[0]
     assert settings.profile == "full"
     assert settings.modules == PROFILES["full"][1]
-    assert (settings.host, settings.target_user, settings.sudo_user) == ("203.0.113.10", "developer", "ubuntu")
+    assert (settings.host, settings.target_user, settings.sudo_user) == (
+        "203.0.113.10",
+        "developer",
+        "ubuntu",
+    )
     assert settings.port == 22
     assert not settings.dry_run
 
@@ -63,7 +67,10 @@ def test_the_other_flags_reach_the_settings(seen):
     assert settings.port == 2222
     assert settings.make_user_sudo
     assert settings.dry_run
-    assert (settings.git_user_name, settings.git_user_email) == ("Ada Lovelace", "ada@example.com")
+    assert (settings.git_user_name, settings.git_user_email) == (
+        "Ada Lovelace",
+        "ada@example.com",
+    )
     assert settings.nvm_version == "v0.39.7"
     assert settings.ssh_public_key == KEY
 
@@ -113,7 +120,15 @@ def test_help_lists_profiles_and_modules(capsys):
         cli.main(["--help"])
     assert exit_.value.code == 0
     out = capsys.readouterr().out
-    for name in ("full", "system", "user", "custom", "openssh-ufw", "git-ssh", "certbot"):
+    for name in (
+        "full",
+        "system",
+        "user",
+        "custom",
+        "openssh-ufw",
+        "git-ssh",
+        "certbot",
+    ):
         assert name in out
 
 

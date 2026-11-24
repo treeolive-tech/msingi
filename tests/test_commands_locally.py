@@ -8,6 +8,7 @@ survive the trip, and that modules really change the filesystem.
 import os
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -15,6 +16,10 @@ from msingi import ssh
 from msingi.errors import MsingiError
 from msingi.modules import git_ssh, repos
 from msingi.ssh import Connection
+
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32", reason="needs a POSIX shell to stand in for ssh"
+)
 
 FAKE_SSH = """#!/bin/bash
 while [ "$1" = "-p" ] || [ "$1" = "-i" ] || [ "$1" = "-o" ]; do shift 2; done
@@ -72,9 +77,12 @@ def test_repos_module_creates_the_folder_once(home, settings):
 
 @pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
 def test_awkward_git_names_survive_quoting(home):
-    name = "O'Brien \"Q\" $HOME `date`"
+    name = 'O\'Brien "Q" $HOME `date`'
     git_ssh.configure_git(CONN, name, "ob@example.com")
     stored = subprocess.run(
-        ["git", "config", "--global", "--get", "user.name"], capture_output=True, text=True
+        ["git", "config", "--global", "--get", "user.name"],
+        capture_output=True,
+        text=True,
+        check=False,
     ).stdout.strip()
     assert stored == name

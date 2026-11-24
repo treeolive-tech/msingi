@@ -16,7 +16,11 @@ KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEx ada@laptop"
 def check(settings, **flags):
     """Validate with modules chosen, defaulting to a user module only."""
     settings = replace(settings, modules=settings.modules or ("repos",))
-    validate(settings, needs_sudo=flags.get("needs_sudo", False), needs_git=flags.get("needs_git", False))
+    validate(
+        settings,
+        needs_sudo=flags.get("needs_sudo", False),
+        needs_git=flags.get("needs_git", False),
+    )
 
 
 def test_valid_settings_pass(settings):

@@ -48,7 +48,9 @@ class FakeServer:
         outputs = [stdout] if isinstance(stdout, str) else list(stdout)
         self.replies.append((fragment, user, outputs, returncode))
 
-    def __call__(self, conn, command, *, sudo=False, input=None, check=True, stream=False):
+    def __call__(
+        self, conn, command, *, sudo=False, input=None, check=True, stream=False
+    ):
         """Record the call and return the scripted answer (success with no output by default)."""
         text = command if isinstance(command, str) else shlex.join(command)
         self.calls.append(Call(conn.user, text, sudo, input))

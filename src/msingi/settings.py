@@ -72,23 +72,34 @@ def validate(settings: Settings, *, needs_sudo: bool, needs_git: bool) -> None:
         raise MsingiError(f"invalid host: {settings.host!r}")
     if not 1 <= settings.port <= 65535:
         raise MsingiError(f"invalid port: {settings.port}")
-    for label, name in (("user", settings.target_user), ("sudo user", settings.sudo_user)):
+    for label, name in (
+        ("user", settings.target_user),
+        ("sudo user", settings.sudo_user),
+    ):
         if name and not USER_RE.fullmatch(name):
             raise MsingiError(f"invalid {label} name: {name!r}")
     if not settings.target_user:
         raise MsingiError("a user to set up is required")
     if not VERSION_RE.fullmatch(settings.nvm_version):
-        raise MsingiError(f"invalid nvm version {settings.nvm_version!r} (like v0.40.4)")
+        raise MsingiError(
+            f"invalid nvm version {settings.nvm_version!r} (like v0.40.4)"
+        )
     if settings.key and not settings.key.is_file():
         raise MsingiError(f"SSH key file not found: {settings.key}")
     if settings.ssh_public_key and not is_public_key(settings.ssh_public_key):
-        raise MsingiError("the public key must be one line like 'ssh-ed25519 AAAA... comment'")
+        raise MsingiError(
+            "the public key must be one line like 'ssh-ed25519 AAAA... comment'"
+        )
     if needs_sudo and not settings.sudo_user:
         raise MsingiError("a sudo user is required for system modules (--sudo-user)")
     if settings.copy_key and not needs_git:
-        raise MsingiError("--copy needs the git-ssh module (it copies the new Git public key)")
+        raise MsingiError(
+            "--copy needs the git-ssh module (it copies the new Git public key)"
+        )
     if needs_git:
         if not (settings.git_user_name and settings.git_user_email):
-            raise MsingiError("--git-name and --git-email are required for the git-ssh module")
+            raise MsingiError(
+                "--git-name and --git-email are required for the git-ssh module"
+            )
         if not EMAIL_RE.fullmatch(settings.git_user_email):
             raise MsingiError(f"invalid email format: {settings.git_user_email}")

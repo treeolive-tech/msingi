@@ -19,7 +19,10 @@ def _version() -> str:
 
         _version()  # "0.1.0"
     """
-    from importlib.metadata import PackageNotFoundError, version  # slow, only needed here
+    from importlib.metadata import (
+        PackageNotFoundError,
+        version,
+    )  # slow, only needed here
 
     try:
         return version("msingi")
@@ -29,9 +32,7 @@ def _version() -> str:
 
 def _epilog() -> str:
     """List the profiles and modules for ``--help``."""
-    profiles = "\n".join(
-        f"  {name:<8}{label}" for name, (label, _) in PROFILES.items()
-    )
+    profiles = "\n".join(f"  {name:<8}{label}" for name, (label, _) in PROFILES.items())
     names = "\n".join(
         f"  {module.NAME:<12}{'system (sudo)' if module.SYSTEM else 'user':<15}{module.TITLE}"
         for module in MODULES
@@ -88,7 +89,9 @@ def _parser() -> argparse.ArgumentParser:
         help="set up only these modules (custom profile)",
     )
     p.add_argument("--git-name", metavar="NAME", help="Git user name (git-ssh module)")
-    p.add_argument("--git-email", metavar="EMAIL", help="Git user email (git-ssh module)")
+    p.add_argument(
+        "--git-email", metavar="EMAIL", help="Git user email (git-ssh module)"
+    )
     p.add_argument(
         "--nvm-version",
         default=os.environ.get("MSINGI_NVM_VERSION", DEFAULT_NVM_VERSION),

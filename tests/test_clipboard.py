@@ -13,7 +13,9 @@ from msingi.profiles import PROFILES
 from msingi.settings import validate
 
 KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEx ada@example.com"
-UFW_READY = "Status: active\nOpenSSH    ALLOW    Anywhere\nNginx Full    ALLOW    Anywhere\n"
+UFW_READY = (
+    "Status: active\nOpenSSH    ALLOW    Anywhere\nNginx Full    ALLOW    Anywhere\n"
+)
 
 
 class FakePyperclip(types.ModuleType):
@@ -81,7 +83,9 @@ def test_run_does_not_copy_unless_asked(git_run, pyperclip, capsys):
     assert "copied to the clipboard" not in capsys.readouterr().out
 
 
-def test_a_broken_clipboard_only_warns_and_the_key_is_still_printed(git_run, monkeypatch, capsys):
+def test_a_broken_clipboard_only_warns_and_the_key_is_still_printed(
+    git_run, monkeypatch, capsys
+):
     monkeypatch.setitem(sys.modules, "pyperclip", FakePyperclip(broken=True))
     runner.provision(git_run)
     out = capsys.readouterr().out
@@ -98,14 +102,28 @@ def test_dry_run_copies_nothing(git_run, pyperclip):
 def test_copy_needs_the_git_ssh_module(settings):
     with pytest.raises(MsingiError, match="--copy needs the git-ssh module"):
         validate(
-            replace(settings, modules=("repos",), copy_key=True), needs_sudo=False, needs_git=False
+            replace(settings, modules=("repos",), copy_key=True),
+            needs_sudo=False,
+            needs_git=False,
         )
 
 
 def test_copy_flag_reaches_the_settings(monkeypatch):
     seen = []
     monkeypatch.setattr(runner, "provision", seen.append)
-    cli.main(["203.0.113.10", "dev", "-s", "ubuntu", "--copy", "--git-name", "Ada", "--git-email", "ada@example.com"])
+    cli.main(
+        [
+            "203.0.113.10",
+            "dev",
+            "-s",
+            "ubuntu",
+            "--copy",
+            "--git-name",
+            "Ada",
+            "--git-email",
+            "ada@example.com",
+        ]
+    )
     assert seen[0].copy_key
     assert seen[0].modules == PROFILES["full"][1]
     cli.main(["203.0.113.10", "dev", "-s", "ubuntu"])

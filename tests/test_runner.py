@@ -12,7 +12,9 @@ from msingi.profiles import PROFILES
 PUBLIC_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEx ada@example.com"
 
 
-UFW_READY = "Status: active\nOpenSSH    ALLOW    Anywhere\nNginx Full    ALLOW    Anywhere\n"
+UFW_READY = (
+    "Status: active\nOpenSSH    ALLOW    Anywhere\nNginx Full    ALLOW    Anywhere\n"
+)
 
 
 @pytest.fixture
@@ -43,12 +45,20 @@ def test_dry_run_only_looks(server, full, capsys):
     assert "SSH public key" not in out
 
 
-def test_system_modules_run_as_the_sudo_user_and_user_modules_as_the_target(server, full, capsys):
+def test_system_modules_run_as_the_sudo_user_and_user_modules_as_the_target(
+    server, full, capsys
+):
     server.when("id_ed25519.pub", stdout=PUBLIC_KEY + "\n")
     runner.provision(full)
 
-    packages = next(i for i, c in enumerate(server.calls) if "apt-get install -y git" in c.text)
-    git = next(i for i, c in enumerate(server.calls) if "git config --global user.name" in c.text)
+    packages = next(
+        i for i, c in enumerate(server.calls) if "apt-get install -y git" in c.text
+    )
+    git = next(
+        i
+        for i, c in enumerate(server.calls)
+        if "git config --global user.name" in c.text
+    )
     assert server.calls[packages].user == "ubuntu"
     assert server.calls[git].user == "developer"
     assert packages < git
@@ -58,7 +68,9 @@ def test_system_modules_run_as_the_sudo_user_and_user_modules_as_the_target(serv
     assert PUBLIC_KEY in out
 
 
-def test_modules_run_in_registry_order_whatever_the_selection_order(server, settings, capsys):
+def test_modules_run_in_registry_order_whatever_the_selection_order(
+    server, settings, capsys
+):
     runner.provision(replace(settings, modules=("nvm", "nginx"), profile="custom"))
     out = capsys.readouterr().out
     assert out.index("Setting up Nginx") < out.index("Setting up nvm")
@@ -83,8 +95,12 @@ def test_missing_sudo_user_stops_before_touching_the_server(server, full):
     assert server.calls == []
 
 
-def test_user_modules_connect_as_the_target_when_there_is_no_sudo_user(server, settings):
-    runner.provision(replace(settings, sudo_user="", modules=("repos",), profile="custom"))
+def test_user_modules_connect_as_the_target_when_there_is_no_sudo_user(
+    server, settings
+):
+    runner.provision(
+        replace(settings, sudo_user="", modules=("repos",), profile="custom")
+    )
     assert {call.user for call in server.calls} == {"developer"}
 
 

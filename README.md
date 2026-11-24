@@ -86,12 +86,12 @@ msingi 203.0.113.10 developer --sudo-user ubuntu --make-sudo \
 
 Pick one with `-P`, or choose your own modules with `-m`.
 
-| Profile                       | System modules                                    | User modules                  | Best for                                         |
-| ----------------------------- | ------------------------------------------------- | ----------------------------- | ------------------------------------------------ |
-| **`full`** (default)          | OpenSSH/UFW, Packages, Nginx, Certbot, PostgreSQL | uv, nvm, repos dir, Git + SSH | A brand-new server, everything in one go         |
-| **`system`**                  | OpenSSH/UFW, Packages, Nginx, Certbot, PostgreSQL | none                          | Infrastructure without personal dev tools        |
-| **`user`**                    | none                                              | uv, nvm, repos dir, Git + SSH | Adding dev tools to a user, no sudo needed       |
-| **`custom`** (set by `-m`)    | the ones you name                                 | the ones you name             | Fine-grained control, or adding one module later |
+| Profile                    | System modules                                    | User modules                  | Best for                                         |
+| -------------------------- | ------------------------------------------------- | ----------------------------- | ------------------------------------------------ |
+| **`full`** (default)       | OpenSSH/UFW, Packages, Nginx, Certbot, PostgreSQL | uv, nvm, repos dir, Git + SSH | A brand-new server, everything in one go         |
+| **`system`**               | OpenSSH/UFW, Packages, Nginx, Certbot, PostgreSQL | none                          | Infrastructure without personal dev tools        |
+| **`user`**                 | none                                              | uv, nvm, repos dir, Git + SSH | Adding dev tools to a user, no sudo needed       |
+| **`custom`** (set by `-m`) | the ones you name                                 | the ones you name             | Fine-grained control, or adding one module later |
 
 ```bash
 msingi 203.0.113.10 developer -s ubuntu -P system
@@ -107,23 +107,23 @@ Modules always run in the same order, whatever order you list them in.
 msingi HOST USER [options]
 ```
 
-| Option                       | What it does                                                                                                   |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `HOST`                       | Server IP address or hostname                                                                                  |
-| `USER`                       | The user to set up. Created if missing. User modules run as this user.                                         |
-| `-p, --port PORT`            | SSH port (default: `22`)                                                                                       |
-| `-k, --key FILE`             | Private key to log in with (also `MSINGI_SSH_KEY`). Default: ssh's own keys and agent.                         |
-| `-s, --sudo-user USER`       | Existing user with passwordless sudo, used for system modules (also `MSINGI_SUDO_USER`)                        |
-| `--make-sudo`                | Give `USER` passwordless sudo (new or existing)                                                                |
-| `--public-key KEY_OR_FILE`   | Public key (or a `.pub` file) to add to `USER`'s `authorized_keys`                                             |
-| `-P, --profile NAME`         | `full`, `system`, `user` or `custom` (default: `full`)                                                         |
-| `-m, --modules A,B`          | Set up only these modules (a custom profile). Can't be combined with `-P full`, `system` or `user`.            |
-| `--git-name NAME`            | Git user name. Required when the Git + SSH module runs.                                                        |
-| `--git-email EMAIL`          | Git user email. Required when the Git + SSH module runs; must look like an email.                              |
-| `--nvm-version TAG`          | nvm release to install (default: `v0.40.4`; also `MSINGI_NVM_VERSION`)                                         |
-| `-c, --copy`                 | Copy the new Git public key to your clipboard (needs the Git + SSH module). On Linux the clipboard needs `xclip`, `xsel` or `wl-clipboard`. If copying fails, the key is still printed. |
-| `-n, --dry-run`              | Show what would happen, change nothing                                                                         |
-| `-V, --version`              | Print the installed version and exit                                                                           |
+| Option                     | What it does                                                                                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HOST`                     | Server IP address or hostname                                                                                                                                                           |
+| `USER`                     | The user to set up. Created if missing. User modules run as this user.                                                                                                                  |
+| `-p, --port PORT`          | SSH port (default: `22`)                                                                                                                                                                |
+| `-k, --key FILE`           | Private key to log in with (also `MSINGI_SSH_KEY`). Default: ssh's own keys and agent.                                                                                                  |
+| `-s, --sudo-user USER`     | Existing user with passwordless sudo, used for system modules (also `MSINGI_SUDO_USER`)                                                                                                 |
+| `--make-sudo`              | Give `USER` passwordless sudo (new or existing)                                                                                                                                         |
+| `--public-key KEY_OR_FILE` | Public key (or a `.pub` file) to add to `USER`'s `authorized_keys`                                                                                                                      |
+| `-P, --profile NAME`       | `full`, `system`, `user` or `custom` (default: `full`)                                                                                                                                  |
+| `-m, --modules A,B`        | Set up only these modules (a custom profile). Can't be combined with `-P full`, `system` or `user`.                                                                                     |
+| `--git-name NAME`          | Git user name. Required when the Git + SSH module runs.                                                                                                                                 |
+| `--git-email EMAIL`        | Git user email. Required when the Git + SSH module runs; must look like an email.                                                                                                       |
+| `--nvm-version TAG`        | nvm release to install (default: `v0.40.4`; also `MSINGI_NVM_VERSION`)                                                                                                                  |
+| `-c, --copy`               | Copy the new Git public key to your clipboard (needs the Git + SSH module). On Linux the clipboard needs `xclip`, `xsel` or `wl-clipboard`. If copying fails, the key is still printed. |
+| `-n, --dry-run`            | Show what would happen, change nothing                                                                                                                                                  |
+| `-V, --version`            | Print the installed version and exit                                                                                                                                                    |
 
 Flags beat environment variables. `NO_COLOR=1` turns colour off.
 
@@ -133,24 +133,24 @@ Flags beat environment variables. `NO_COLOR=1` turns colour off.
 
 These run as `--sudo-user` and need sudo.
 
-| Module         | Name          | What it does                                                                                                                  |
-| -------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| 🔒 OpenSSH/UFW | `openssh-ufw` | Allows OpenSSH (and your SSH port, if it isn't 22) in UFW, then enables UFW only once the rule is confirmed                   |
-| 🛠️ Packages    | `packages`    | Installs git, curl, wget, snapd, SQLite, Pandoc, TeX (XeTeX), and build tools                                                 |
-| 🌐 Nginx       | `nginx`       | Installs, enables and starts Nginx, opens `Nginx Full` in UFW, and writes the `port-proxy.conf` snippet                       |
-| 🔏 Certbot     | `certbot`     | Installs Certbot through snap (needs `snapd`, which Packages provides)                                                        |
-| 🐘 PostgreSQL  | `postgres`    | Installs PostgreSQL and contrib, then enables and starts the service                                                          |
+| Module         | Name          | What it does                                                                                                |
+| -------------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
+| 🔒 OpenSSH/UFW | `openssh-ufw` | Allows OpenSSH (and your SSH port, if it isn't 22) in UFW, then enables UFW only once the rule is confirmed |
+| 🛠️ Packages    | `packages`    | Installs git, curl, wget, snapd, SQLite, Pandoc, TeX (XeTeX), and build tools                               |
+| 🌐 Nginx       | `nginx`       | Installs, enables and starts Nginx, opens `Nginx Full` in UFW, and writes the `port-proxy.conf` snippet     |
+| 🔏 Certbot     | `certbot`     | Installs Certbot through snap (needs `snapd`, which Packages provides)                                      |
+| 🐘 PostgreSQL  | `postgres`    | Installs PostgreSQL and contrib, then enables and starts the service                                        |
 
 ### User modules
 
 These run as `USER`, without sudo.
 
-| Module       | Name      | What it does                                                                                    |
-| ------------ | --------- | ----------------------------------------------------------------------------------------------- |
-| 🐍 uv        | `uv`      | Installs [uv](https://docs.astral.sh/uv/), then a Python through it if uv manages none yet      |
-| 📗 nvm       | `nvm`     | Installs nvm (version from `--nvm-version`), then the latest Node.js, and updates npm           |
-| 📁 Repos dir | `repos`   | Makes sure `~/repos` exists                                                                     |
-| 🔑 Git + SSH | `git-ssh` | Sets global git name and email, and creates `~/.ssh/id_ed25519` if absent                       |
+| Module       | Name      | What it does                                                                               |
+| ------------ | --------- | ------------------------------------------------------------------------------------------ |
+| 🐍 uv        | `uv`      | Installs [uv](https://docs.astral.sh/uv/), then a Python through it if uv manages none yet |
+| 📗 nvm       | `nvm`     | Installs nvm (version from `--nvm-version`), then the latest Node.js, and updates npm      |
+| 📁 Repos dir | `repos`   | Makes sure `~/repos` exists                                                                |
+| 🔑 Git + SSH | `git-ssh` | Sets global git name and email, and creates `~/.ssh/id_ed25519` if absent                  |
 
 ### Nginx: a proxy snippet, not a site
 
@@ -171,11 +171,11 @@ Then `sudo nginx -t && sudo systemctl reload nginx`.
 
 msingi stops at the foundation on purpose. These are left to you:
 
-| Module     | Follow-up                                                                               |
-| ---------- | --------------------------------------------------------------------------------------- |
-| Nginx      | Add your server block (above)                                                           |
-| Certbot    | Once your domain and server block exist: `sudo certbot certonly --nginx -d your.domain` |
-| PostgreSQL | Create roles and databases: `sudo -iu postgres psql`                                    |
+| Module     | Follow-up                                                                                                         |
+| ---------- | ----------------------------------------------------------------------------------------------------------------- |
+| Nginx      | Add your server block (above)                                                                                     |
+| Certbot    | Once your domain and server block exist: `sudo certbot certonly --nginx -d your.domain`                           |
+| PostgreSQL | Create roles and databases: `sudo -iu postgres psql`                                                              |
 | Git + SSH  | Copy the public key printed at the end of the run (or use `--copy`) into GitHub, GitLab or wherever you host code |
 
 ## Dry run
@@ -228,16 +228,16 @@ Each module is one file in `src/msingi/modules/` with a `setup(conn, settings)` 
 
 msingi used to be a GitHub Actions workflow plus shell scripts. The modules do the same jobs, now as Python run from your machine.
 
-| Before (workflow)                          | Now (CLI)                                                  |
-| ------------------------------------------ | ---------------------------------------------------------- |
-| Fork the repo, add Secrets and Variables   | Nothing to set up; `uvx msingi ...`                        |
-| `SERVER_SSH_KEY` secret                    | Your own key: `--key`, or ssh-agent                        |
-| `SUDO_ACCESS_USER` secret                  | `--sudo-user` (or `MSINGI_SUDO_USER`)                      |
-| `setup_profile` input                      | `--profile`                                                |
-| Custom profile with `SETUP_*` variables    | `--modules nginx,nvm`                                      |
-| `NVM_VERSION` variable                     | `--nvm-version`                                            |
-| Scripts uploaded to `/tmp`, then removed   | Commands run directly, nothing left on the server          |
-| Key printed in the run summary             | Key printed in your terminal at the end                    |
+| Before (workflow)                        | Now (CLI)                                         |
+| ---------------------------------------- | ------------------------------------------------- |
+| Fork the repo, add Secrets and Variables | Nothing to set up; `uvx msingi ...`               |
+| `SERVER_SSH_KEY` secret                  | Your own key: `--key`, or ssh-agent               |
+| `SUDO_ACCESS_USER` secret                | `--sudo-user` (or `MSINGI_SUDO_USER`)             |
+| `setup_profile` input                    | `--profile`                                       |
+| Custom profile with `SETUP_*` variables  | `--modules nginx,nvm`                             |
+| `NVM_VERSION` variable                   | `--nvm-version`                                   |
+| Scripts uploaded to `/tmp`, then removed | Commands run directly, nothing left on the server |
+| Key printed in the run summary           | Key printed in your terminal at the end           |
 
 A few things changed on purpose while porting:
 
@@ -250,14 +250,14 @@ A few things changed on purpose while porting:
 
 ## Troubleshooting
 
-| Problem                          | What to check                                                                                                        |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| "can't connect to …"             | Host, port, and that `ssh -i KEY USER@HOST` works by itself. msingi can't type passwords or passphrases.            |
-| `a sudo user is required`        | System modules need `--sudo-user` (or `MSINGI_SUDO_USER`), and that user needs passwordless sudo                     |
-| Can't log in as the new user     | Pass `--public-key` so msingi can add your key before the user modules run                                           |
-| Git module error                 | Give both `--git-name` and `--git-email` whenever the profile includes Git + SSH                                     |
-| UFW wasn't enabled               | The SSH rule couldn't be confirmed. Fix that and run again; it's a deliberate safeguard                              |
-| Certbot says snapd is missing    | Run `packages` first (it installs `snapd`), or include it in your `--modules`                                        |
+| Problem                       | What to check                                                                                            |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------- |
+| "can't connect to …"          | Host, port, and that `ssh -i KEY USER@HOST` works by itself. msingi can't type passwords or passphrases. |
+| `a sudo user is required`     | System modules need `--sudo-user` (or `MSINGI_SUDO_USER`), and that user needs passwordless sudo         |
+| Can't log in as the new user  | Pass `--public-key` so msingi can add your key before the user modules run                               |
+| Git module error              | Give both `--git-name` and `--git-email` whenever the profile includes Git + SSH                         |
+| UFW wasn't enabled            | The SSH rule couldn't be confirmed. Fix that and run again; it's a deliberate safeguard                  |
+| Certbot says snapd is missing | Run `packages` first (it installs `snapd`), or include it in your `--modules`                            |
 
 ## Security
 

@@ -41,9 +41,13 @@ def enable_and_start(conn: Connection, service: str) -> None:
 
         enable_and_start(conn, "nginx")  # nothing happens if it is enabled and running
     """
-    if not ssh.succeeds(conn, ["systemctl", "is-enabled", "--quiet", service], sudo=True):
+    if not ssh.succeeds(
+        conn, ["systemctl", "is-enabled", "--quiet", service], sudo=True
+    ):
         ssh.run(conn, ["systemctl", "enable", service], sudo=True)
-    if not ssh.succeeds(conn, ["systemctl", "is-active", "--quiet", service], sudo=True):
+    if not ssh.succeeds(
+        conn, ["systemctl", "is-active", "--quiet", service], sudo=True
+    ):
         ssh.run(conn, ["systemctl", "start", service], sudo=True)
 
 

@@ -29,7 +29,11 @@ def install_uv(conn: Connection) -> None:
     if ssh.succeeds(conn, f"test -x {UV_BIN}"):
         output.ok("uv already installed")
         return
-    ssh.run(conn, "set -o pipefail; curl -LsSf https://astral.sh/uv/install.sh | sh", stream=True)
+    ssh.run(
+        conn,
+        "set -o pipefail; curl -LsSf https://astral.sh/uv/install.sh | sh",
+        stream=True,
+    )
 
 
 def install_python(conn: Connection) -> None:

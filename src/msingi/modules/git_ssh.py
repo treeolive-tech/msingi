@@ -57,7 +57,9 @@ def create_key(conn: Connection, email: str) -> None:
         return
 
     output.warn("Generating new SSH key...")
-    ssh.run(conn, f'ssh-keygen -t ed25519 -C {shlex.quote(email)} -N "" -f "{KEY_PATH}"')
+    ssh.run(
+        conn, f'ssh-keygen -t ed25519 -C {shlex.quote(email)} -N "" -f "{KEY_PATH}"'
+    )
     ssh.run(conn, f'chmod 600 "{KEY_PATH}" && chmod 644 "{KEY_PATH}.pub"')
     output.ok("Generated new SSH key")
 

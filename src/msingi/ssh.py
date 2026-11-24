@@ -112,11 +112,13 @@ def run(
 
     # Bytes in, bytes out: text mode would turn "\n" into "\r\n" on Windows, which
     # corrupts files like sudoers and authorized_keys on the server.
-    stdin = {"input": input.encode()} if input is not None else {"stdin": subprocess.DEVNULL}
+    data = input.encode() if input is not None else None
     raw = subprocess.run(
         ssh_command(conn, remote_command(conn, command, sudo)),
+        input=data,
+        stdin=subprocess.DEVNULL if data is None else None,
         capture_output=not stream,
-        **stdin,
+        check=False,
     )
     result = subprocess.CompletedProcess(
         raw.args, raw.returncode, _text(raw.stdout), _text(raw.stderr)

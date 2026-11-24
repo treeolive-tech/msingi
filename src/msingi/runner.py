@@ -30,7 +30,10 @@ def provision(settings: Settings) -> None:
     )
 
     admin = Connection(
-        settings.host, settings.sudo_user or settings.target_user, settings.port, settings.key
+        settings.host,
+        settings.sudo_user or settings.target_user,
+        settings.port,
+        settings.key,
     )
     target = ssh.as_user(admin, settings.target_user)
 
@@ -41,7 +44,9 @@ def provision(settings: Settings) -> None:
     if has_system:
         update_package_lists(admin, settings)
     if has_user and not settings.dry_run:
-        ssh.check_connection(target, hint=f"Pass --public-key so msingi can log in as {target.user}.")
+        ssh.check_connection(
+            target, hint=f"Pass --public-key so msingi can log in as {target.user}."
+        )
 
     for module in selected:
         run_module(module, admin if module.SYSTEM else target, settings)
@@ -94,7 +99,9 @@ def run_module(module: ModuleType, conn: Connection, settings: Settings) -> None
     output.ok(f"{module.TITLE} setup completed")
 
 
-def show_summary(settings: Settings, selected: list[ModuleType], target: Connection) -> None:
+def show_summary(
+    settings: Settings, selected: list[ModuleType], target: Connection
+) -> None:
     """Print what was done, including the new Git public key when there is one.
 
     Examples::
@@ -103,7 +110,9 @@ def show_summary(settings: Settings, selected: list[ModuleType], target: Connect
     """
     print()
     if settings.dry_run:
-        output.warn("Dry run completed: this was a simulation, nothing on the server changed")
+        output.warn(
+            "Dry run completed: this was a simulation, nothing on the server changed"
+        )
     else:
         output.ok("Setup completed successfully!")
 
@@ -120,7 +129,9 @@ def show_summary(settings: Settings, selected: list[ModuleType], target: Connect
     print()
     print("🔑 SSH public key (add it to GitHub, GitLab or wherever you host code):")
     print(key)
-    print(f"The private key stays on the server at ~{settings.target_user}/.ssh/id_ed25519")
+    print(
+        f"The private key stays on the server at ~{settings.target_user}/.ssh/id_ed25519"
+    )
     if settings.copy_key:
         copy_key(key)
 

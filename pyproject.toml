@@ -5,7 +5,7 @@ build-backend = "uv_build"
 
 [project]
 name = "msingi"
-version = "0.1.0b1"
+version = "0.1.0a1"
 description = "Msingi (Swahili for “foundation”): lay the foundation of an Ubuntu server over SSH. Pick a profile, run it, and only the modules you chose are set up."
 readme = "README.md"
 license = "MIT"
@@ -26,7 +26,7 @@ keywords = [
     "treeolive",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",

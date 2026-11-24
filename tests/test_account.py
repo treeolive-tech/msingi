@@ -37,7 +37,10 @@ def test_dry_run_changes_nothing(server, settings, admin, capsys):
 def test_passwordless_sudo_is_written_to_sudoers(server, settings, admin):
     account.ensure_user(admin, replace(settings, make_user_sudo=True))
     assert server.ran("usermod -aG sudo developer")
-    assert server.find("tee /etc/sudoers.d/developer").input == "developer ALL=(ALL) NOPASSWD:ALL\n"
+    assert (
+        server.find("tee /etc/sudoers.d/developer").input
+        == "developer ALL=(ALL) NOPASSWD:ALL\n"
+    )
     assert server.ran("chmod 440 /etc/sudoers.d/developer")
 
 
@@ -52,7 +55,9 @@ def test_public_key_is_appended_and_permissions_fixed(server, settings, admin):
     server.when("cat /home/developer/.ssh/authorized_keys", returncode=1)
     account.ensure_user(admin, replace(settings, ssh_public_key=KEY))
 
-    assert server.find("tee -a /home/developer/.ssh/authorized_keys").input == KEY + "\n"
+    assert (
+        server.find("tee -a /home/developer/.ssh/authorized_keys").input == KEY + "\n"
+    )
     assert server.ran("chmod 700 /home/developer/.ssh")
     assert server.ran("chmod 600 /home/developer/.ssh/authorized_keys")
     assert server.ran("chown -R developer:developer /home/developer/.ssh")
@@ -65,7 +70,9 @@ def test_public_key_already_present_is_not_added_twice(server, settings, admin):
     assert not server.ran("tee -a")
 
 
-def test_key_is_put_on_its_own_line_after_a_file_without_newline(server, settings, admin):
+def test_key_is_put_on_its_own_line_after_a_file_without_newline(
+    server, settings, admin
+):
     server.when("getent passwd developer", stdout=PASSWD)
     server.when("cat /home/developer", stdout="ssh-rsa OTHER")
     account.ensure_user(admin, replace(settings, ssh_public_key=KEY))

@@ -27,7 +27,9 @@ INACTIVE = "Status: inactive\n"
 
 def test_ufw_is_installed_allowed_and_enabled_on_a_bare_server(server, settings, admin):
     server.when("command -v ufw", returncode=1)
-    server.when("ufw status", stdout=(INACTIVE, INACTIVE + "OpenSSH    ALLOW    Anywhere\n"))
+    server.when(
+        "ufw status", stdout=(INACTIVE, INACTIVE + "OpenSSH    ALLOW    Anywhere\n")
+    )
     openssh_ufw.setup(admin, settings)
     assert server.ran("apt-get install -y ufw")
     assert server.ran("ufw allow OpenSSH")
@@ -68,7 +70,9 @@ def test_packages_are_installed_in_one_apt_call(server, settings, admin):
     packages.setup(admin, settings)
     call = server.find("apt-get install")
     assert call.sudo
-    assert all(name in call.text for name in ("git", "snapd", "pandoc", "texlive-xetex"))
+    assert all(
+        name in call.text for name in ("git", "snapd", "pandoc", "texlive-xetex")
+    )
 
 
 # nginx
@@ -91,7 +95,13 @@ def test_nginx_done_is_left_alone(server, settings, admin):
     server.when("cat /etc/nginx", stdout=nginx.SNIPPET)
     server.when("ufw status", stdout="Nginx Full    ALLOW    Anywhere\n")
     nginx.setup(admin, settings)
-    for fragment in ("apt-get", "systemctl enable", "systemctl start", "tee", "ufw allow"):
+    for fragment in (
+        "apt-get",
+        "systemctl enable",
+        "systemctl start",
+        "tee",
+        "ufw allow",
+    ):
         assert not server.ran(fragment)
 
 
@@ -245,7 +255,7 @@ def test_git_is_configured_and_a_key_is_made(server, settings, user_conn):
     git_ssh.setup(user_conn, settings)
     assert server.ran("git config --global user.name 'Ada Lovelace'")
     assert server.ran("git config --global user.email ada@example.com")
-    assert server.ran("ssh-keygen -t ed25519 -C ada@example.com -N \"\"")
+    assert server.ran('ssh-keygen -t ed25519 -C ada@example.com -N ""')
     assert server.ran('touch "$HOME/.ssh/config"')
 
 
