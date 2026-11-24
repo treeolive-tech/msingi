@@ -1,0 +1,65 @@
+# ramani: pyproject.toml
+[build-system]
+requires = ["uv_build>=0.13.9,<0.14.0"]
+build-backend = "uv_build"
+
+[project]
+name = "msingi"
+version = "0.1.0a1"
+description = "Msingi (Swahili for “foundation”): lay the foundation of an Ubuntu server over SSH. Pick a profile, run it, and only the modules you chose are set up."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Kevin Wasike Wakhisi", email = "kevin@treeolive.tech" }]
+maintainers = [
+    { name = "Kevin Wasike Wakhisi", email = "kevin@treeolive.tech" },
+]
+requires-python = ">=3.13"
+keywords = [
+    "ubuntu",
+    "server",
+    "provisioning",
+    "ssh",
+    "devops",
+    "cli",
+    "swahili",
+    "treeolive",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: System :: Installation/Setup",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+dependencies = ["pyperclip>=1.11.0"]
+
+[project.scripts]
+msingi = "msingi:main"
+
+[project.urls]
+Repository = "https://github.com/treeolive-tech/pkg-msingi.git"
+
+[dependency-groups]
+dev = ["pytest>=9.2.0", "pre-commit>=4.7.0", "ramani>=0.1.0"]
+
+[tool.uv]
+preview-features = ["format-command", "check-command"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true

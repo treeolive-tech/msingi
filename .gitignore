@@ -1,6 +1,15 @@
 # ramani: .gitignore
-# `.tmp` folder is intended for roughwork files. Ignore it.
-/.tmp/
-
-# Ignore environment variable files
+# Environment
+/.venv/
 .env
+
+# Cache
+/.ruff_cache/
+/.pytest_cache/
+__pycache__/
+
+# Distribution
+/dist/
+
+# Temporary or Rough work
+.tmp/
