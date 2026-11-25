@@ -3,7 +3,7 @@
 
 <p align="center">
   <strong>Lay the foundation, once, the same way every time.</strong><br>
-  Provision an Ubuntu server over SSH from your own machine: pick a profile, run one command, and only the modules you chose are set up.
+  Provision an Ubuntu server over SSH from your own machine or from the GitHub Actions tab: pick a profile, run it, and only the modules you chose are set up.
 </p>
 
 <p align="center">
@@ -18,11 +18,11 @@
 <p align="center">
   <a href="#install">Install</a> ·
   <a href="#quick-start">Quick start</a> ·
+  <a href="#run-from-github-actions">GitHub Actions</a> ·
   <a href="#profiles">Profiles</a> ·
   <a href="#options">Options</a> ·
   <a href="#modules">Modules</a> ·
   <a href="#dry-run">Dry run</a> ·
-  <a href="#moving-from-github-actions">From GitHub Actions</a> ·
   <a href="#security">Security</a>
 </p>
 
@@ -44,6 +44,7 @@ Setting up a fresh server by hand means the same twenty commands, in a slightly 
 - 👤 **Creates the user for you.** Name the user. If it doesn't exist, msingi creates it, and can give it passwordless sudo and your public key.
 - 🔒 **Lockout-aware firewall.** UFW is enabled only after the SSH rule is confirmed, and a custom SSH port is allowed too.
 - 🔍 **Dry run.** See what would happen before anything on the server changes.
+- 🖱️ **No terminal needed.** Fork the repo and run msingi from the Actions tab with a form.
 - 🔑 **Hands you the Git key.** The generated SSH public key is printed at the end, and `--copy` puts it on your clipboard, ready to paste into GitHub or GitLab.
 - 🪶 **Nothing to install on the server, one small dependency here.** msingi uses the `ssh` command you already have, plus [`pyperclip`](https://pypi.org/project/pyperclip/) for `--copy`.
 
@@ -56,6 +57,8 @@ pipx install msingi         # pipx or plain pip work too: pip install msingi
 ```
 
 msingi needs the OpenSSH client (`ssh`) on your machine. It comes with macOS, Linux and Windows 10/11.
+
+No terminal or ssh client? Skip to [Run from GitHub Actions](#run-from-github-actions).
 
 ## Quick start
 
@@ -81,6 +84,26 @@ msingi 203.0.113.10 developer --sudo-user ubuntu --make-sudo \
   --public-key ~/.ssh/id_ed25519.pub \
   --git-name "Ada Lovelace" --git-email ada@example.com
 ```
+
+## Run from GitHub Actions
+
+No terminal? Fork this repo (a **private** fork is best) and run msingi from the **Actions** tab. The workflow runs the same `msingi` CLI from your fork's code, so nothing is duplicated in YAML.
+
+### Set up once
+
+1. **Settings → Secrets and variables → Actions:** add a secret named `SERVER_SSH_KEY`. It is a private key **without a passphrase** that can log in as your sudo user.
+2. Optional: **Settings → Environments → New environment** named `provision`, tick **Required reviewers** and add people as an approval gate. On a private repo this needs a paid GitHub plan.
+
+### Run it
+
+1. Open **Actions → Provision a server → Run workflow**.
+2. Fill in the form. The inputs mirror the CLI flags: host, user, sudo user, port, profile, modules, make sudo, public key, Git name and email, nvm version and dry run.
+3. Leave **Dry run** on for the first run to see the plan, then run again with it off.
+
+The new Git public key is printed in the run log. `modules` only applies to the `custom` profile, just like `-m` on the command line. `--copy` doesn't apply on a runner.
+
+> [!NOTE]
+> Logs are public in a public repo. The workflow masks the host and Git email (shown as `***`), but not every input: user names and the Git public key still appear. The public key is safe to share. A private fork is the safest choice if you don't want any of it visible. GitHub-hosted runners also have changing IP addresses, so this won't reach a server whose firewall only allows SSH from known addresses.
 
 ## Profiles
 
@@ -224,30 +247,6 @@ What a dry run does and doesn't do:
 
 Each module is one file in `src/msingi/modules/` with a `setup(conn, settings)` function. It checks its own state (binary installed, service enabled, directory or key present) and does only what is missing, so the second run changes nothing.
 
-## Moving from GitHub Actions
-
-msingi used to be a GitHub Actions workflow plus shell scripts. The modules do the same jobs, now as Python run from your machine.
-
-| Before (workflow)                        | Now (CLI)                                         |
-| ---------------------------------------- | ------------------------------------------------- |
-| Fork the repo, add Secrets and Variables | Nothing to set up; `uvx msingi ...`               |
-| `SERVER_SSH_KEY` secret                  | Your own key: `--key`, or ssh-agent               |
-| `SUDO_ACCESS_USER` secret                | `--sudo-user` (or `MSINGI_SUDO_USER`)             |
-| `setup_profile` input                    | `--profile`                                       |
-| Custom profile with `SETUP_*` variables  | `--modules nginx,nvm`                             |
-| `NVM_VERSION` variable                   | `--nvm-version`                                   |
-| Scripts uploaded to `/tmp`, then removed | Commands run directly, nothing left on the server |
-| Key printed in the run summary           | Key printed in your terminal at the end           |
-
-A few things changed on purpose while porting:
-
-- **No shell injection.** The workflow pasted inputs straight into shell scripts, so a quote in a public key could run commands. msingi checks every input and quotes every command.
-- **UFW and custom SSH ports.** The old script only allowed the `OpenSSH` profile (port 22), so enabling UFW on a server with SSH on another port would lock you out. msingi also allows your `--port`.
-- **uv.** `uv python list` includes downloadable versions, so the old check always said Python was installed. msingi counts only Pythons that uv manages itself (the system Python doesn't count).
-- **nvm.** `nvm ls | grep node` matches nvm's built-in `node` alias even with no Node.js installed. msingi asks `nvm version node`, which prints `N/A` when there is none.
-- **Failed downloads.** `curl ... | sh` went on after a failed download; msingi stops.
-- **Authorized keys.** A key is skipped only when the exact line is already there, and it is written without going through a shell.
-
 ## Troubleshooting
 
 | Problem                       | What to check                                                                                            |
@@ -258,6 +257,7 @@ A few things changed on purpose while porting:
 | Git module error              | Give both `--git-name` and `--git-email` whenever the profile includes Git + SSH                         |
 | UFW wasn't enabled            | The SSH rule couldn't be confirmed. Fix that and run again; it's a deliberate safeguard                  |
 | Certbot says snapd is missing | Run `packages` first (it installs `snapd`), or include it in your `--modules`                            |
+| Workflow can't connect        | Check the `SERVER_SSH_KEY` secret (no passphrase) and that the server's firewall allows runner IPs       |
 
 ## Security
 
@@ -267,6 +267,7 @@ A few things changed on purpose while porting:
 - The generated Git private key never leaves the server. Only the public half is printed.
 - Audit `~/.ssh/authorized_keys` and skim the output of a run for surprises.
 - Give `--sudo-user` no more privilege than the modules need.
+- In the GitHub Actions workflow, keep `SERVER_SSH_KEY` as a secret, prefer a private fork (logs are public in a public repo, and only the host and Git email are masked), and consider required reviewers on the `provision` environment. The key is written to a temporary file readable only by the runner user and deleted when the job ends.
 
 ## Add your own module
 
@@ -285,6 +286,9 @@ uv run pytest
 msingi has one runtime dependency, [`pyperclip`](https://pypi.org/project/pyperclip/), imported only when you pass `--copy`. Tests use a fake server, plus a stand-in `ssh` that runs commands on your own machine to check quoting.
 
 ```text
+.github/workflows/
+  provision.yml run msingi from the Actions tab
+  publish.yml   publish to PyPI or TestPyPI
 src/msingi/
   cli.py        arguments in, settings out
   runner.py     the whole run, top to bottom
