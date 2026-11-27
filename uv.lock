@@ -58,7 +58,7 @@ wheels = [
 
 [[package]]
 name = "msingi"
-version = "0.1.0a1"
+version = "0.1.0a2"
 source = { editable = "." }
 dependencies = [
     { name = "pyperclip" },
@@ -78,7 +78,7 @@ requires-dist = [{ name = "pyperclip", specifier = ">=1.11.0" }]
 dev = [
     { name = "pre-commit", specifier = ">=4.7.0" },
     { name = "pytest", specifier = ">=9.2.0" },
-    { name = "ramani", specifier = ">=0.1.0" },
+    { name = "ramani", specifier = ">=0.1.1" },
 ]
 
 [[package]]
@@ -235,15 +235,15 @@ wheels = [
 
 [[package]]
 name = "ramani"
-version = "0.1.0"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyperclip" },
     { name = "termcolor" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/09/83/e815f45c2fdcfd1389da7dde6bbd18c1609a3d42d13c25f89171e21d848f/ramani-0.1.0.tar.gz", hash = "sha256:70646959ce6bf4b8bae14d1c2f099b350802f0a07734426abdf84a9d3a9291c0", size = 29097, upload-time = "2026-11-09T01:58:39.265Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/08/d8/154e8a20e75ec8e58ced20cf5fa7ce05b6c90e021948ae9c789b70be7b09/ramani-0.1.1.tar.gz", hash = "sha256:bf9a38161223966118ebf9e1247bf7d970a625db4c8dce655722944a8f2cbf14", size = 29994, upload-time = "2026-11-27T02:06:32.854Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/28/ba/0cb270c162de0eaa7e55e0e843aa789f57d9b7543014c17471528fc22315/ramani-0.1.0-py3-none-any.whl", hash = "sha256:dca77c5e528bab792389882c3f82d755d993bd79669e572226555b30d9cd480c", size = 26937, upload-time = "2026-11-09T01:58:38.103Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/9c/c80c9deca078af5645ecb2e98318322206cce926282215263cf42e72dd13/ramani-0.1.1-py3-none-any.whl", hash = "sha256:2163c3f96a34afd78eea9adf998e7ab5e513cc6e1964bb5fe306ac55f3a361c9", size = 27872, upload-time = "2026-11-27T02:06:31.729Z" },
 ]
 
 [[package]]

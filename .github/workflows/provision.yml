@@ -1,0 +1,121 @@
+# ramani: .github/workflows/provision.yml
+# Run msingi from the Actions tab, for people without a terminal.
+# Setup
+# 1. Add the repo secret SERVER_SSH_KEY: a private key WITHOUT a passphrase that can log in as the sudo user.
+# 2. Optional: create an environment named 'provision' and add required reviewers as an approval gate.
+# 3. Prefer a private fork: logs are public in a public repo. The host and Git email are masked, but other inputs (such as user names) are not.
+name: Provision a server
+
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: "Server IP address or hostname"
+        required: true
+        type: string
+      user:
+        description: "User to set up (created if it doesn't exist)"
+        required: true
+        type: string
+      sudo_user:
+        description: "Existing user with passwordless sudo (needed for system modules)"
+        default: "ubuntu"
+        type: string
+      port:
+        description: "SSH port"
+        default: "22"
+        type: string
+      profile:
+        description: "What to set up. Use 'custom' together with the modules input."
+        type: choice
+        options: [full, system, user, custom]
+        default: full
+      modules:
+        description: "Only for profile 'custom': comma-separated, e.g. nginx,nvm"
+        type: string
+      make_sudo:
+        description: "Give the user passwordless sudo"
+        type: boolean
+        default: false
+      public_key:
+        description: "Public key to add to the user's authorized_keys (needed for a new user)"
+        type: string
+      git_name:
+        description: "Git user name (required when git-ssh runs)"
+        type: string
+      git_email:
+        description: "Git user email (required when git-ssh runs)"
+        type: string
+      nvm_version:
+        description: "nvm release to install"
+        default: "v0.40.4"
+        type: string
+      dry_run:
+        description: "Preview only: change nothing on the server"
+        type: boolean
+        default: true
+
+jobs:
+  provision:
+    runs-on: ubuntu-26.04
+    environment: provision
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          enable-cache: false
+
+      # Read the values from the event file, not env:, because env: values are printed in the step header before masking.
+      - name: Mask host and Git email in logs
+        shell: bash
+        run: |
+          for name in host git_email; do
+            value="$(jq -r ".inputs.$name // empty" "$GITHUB_EVENT_PATH" | head -n1)"
+            [ -n "$value" ] && echo "::add-mask::$value"
+          done
+          exit 0
+
+      # Inputs go through env:, never into the script text, so a quote or ';' can't run commands.
+      - name: Run msingi
+        shell: bash
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          HOST: ${{ inputs.host }}
+          TARGET_USER: ${{ inputs.user }}
+          SUDO_USER: ${{ inputs.sudo_user }}
+          PORT: ${{ inputs.port }}
+          PROFILE: ${{ inputs.profile }}
+          MODULES: ${{ inputs.modules }}
+          MAKE_SUDO: ${{ inputs.make_sudo }}
+          PUBLIC_KEY: ${{ inputs.public_key }}
+          GIT_NAME: ${{ inputs.git_name }}
+          GIT_EMAIL: ${{ inputs.git_email }}
+          NVM_VERSION: ${{ inputs.nvm_version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ -z "$SERVER_SSH_KEY" ]; then
+            echo "::error::Add the SERVER_SSH_KEY secret (a private key without a passphrase)."
+            exit 1
+          fi
+
+          umask 077
+          key="$RUNNER_TEMP/server_key"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$SERVER_SSH_KEY" > "$key"
+
+          args=("$HOST" "$TARGET_USER" -p "$PORT" -k "$key" -P "$PROFILE" --nvm-version "$NVM_VERSION")
+          [ -n "$SUDO_USER" ] && args+=(-s "$SUDO_USER")
+          [ -n "$MODULES" ] && args+=(-m "$MODULES")
+          [ -n "$PUBLIC_KEY" ] && args+=(--public-key "$PUBLIC_KEY")
+          [ -n "$GIT_NAME" ] && args+=(--git-name "$GIT_NAME")
+          [ -n "$GIT_EMAIL" ] && args+=(--git-email "$GIT_EMAIL")
+          [ "$MAKE_SUDO" = "true" ] && args+=(--make-sudo)
+          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+
+          uv run --locked --no-dev msingi "${args[@]}"
